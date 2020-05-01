@@ -1,0 +1,19 @@
+[package]
+name = "rustyHUD"
+version = "0.1.0"
+authors = ["willnilges <will.nilges@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = "2.33.0"
+ncurses = "5.99.0"
+
+[lib]
+name = "altctrl"
+path = "src/lib.rs"
+
+[[bin]]
+name = "main"
+path = "src/bin/main.rs"
