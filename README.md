@@ -1,6 +1,6 @@
 # RustyHUD
 
-So I'm stealing my TUI window manager code stuff out of [The Computer Science House ImagineRIT 2020](https://github.com/ComputerScienceHouse/altctrl) project repo and I guess I'm gonna make a crate out of it. My vision is a useful and powerful menu/HUD system for terminal-based games. Yes, you could probably get away with using [cursive](https://github.com/gyscos/cursive) or [tui-rs](https://github.com/fdehau/tui-rs) or something, but I did it my way! I guess the main goal of this is to provide unobtrusive UI elements overtop of whatever else is in your terminal. Ideally, you should be able to toggle this like an overlay on interactive applications. Additionally, this only needs ncurses.
+I've stolen my TUI window manager out of [The Computer Science House ImagineRIT 2020](https://github.com/ComputerScienceHouse/altctrl) project repo and made a crate out of it. My vision is a useful and powerful menu/HUD system for terminal-based games. Yes, you could probably get away with using [cursive](https://github.com/gyscos/cursive) or [tui-rs](https://github.com/fdehau/tui-rs) or something, but I wanted to use what I had already written to try to learn something! The main goal of this is to provide a dead-simple, lightweight, and unobtrusive way to create UI elements overtop of whatever else is in your terminal. Ideally, you should be able to toggle this like an overlay on interactive applications.
 
 ### Dependencies:
 
@@ -8,7 +8,7 @@ So I'm stealing my TUI window manager code stuff out of [The Computer Science Ho
  - `ncurses-dev`
 
 ### Garfanzo (Definitely busted right now but don't worry about it):
-Garfanzo™ is our debug program.
+Garfanzo™ is a demo program.
 
 To properly run Garfanzo, you need to pipe the output to another tty. You can do this from a desktop session like so:
 
