@@ -1,5 +1,5 @@
 [package]
-name = "rusty_hud"
+name = "rustyhud"
 version = "0.1.0"
 authors = ["willnilges <will.nilges@gmail.com>"]
 edition = "2018"
@@ -12,5 +12,5 @@ regex = "1.3.3"
 lazy_static = "1.4.0"
 
 [lib]
-name = "rusty_hud"
+name = "rustyhud"
 path = "src/lib.rs"

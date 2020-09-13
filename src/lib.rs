@@ -1,57 +1,209 @@
 use ncurses::*;
-use std::collections::HashMap;
 
 // New window struct
 #[derive(Clone, Debug)]
 pub struct WindowData {
     pub id       : String,
-    pub content  : String,
+    pub content  : WindowContent,
     pub message  : String,
-    pub style    : String,
+    pub style    : WindowStyle,
+    pub ticks    : Option<String>,
     pub x_pos    : i32,
     pub y_pos    : i32,
     pub width    : i32,
     pub height   : i32,
-    pub priority : bool,
+    pub priority : bool, // Deprecated.
+    ncurses_win  : Option<WINDOW>,
 }
 
-pub fn close_win(window: String, windows: &mut HashMap<String,(WINDOW, WindowData)>) {
-    match window.as_ref() {
-        "mainwindow" => {
-        },
-        _ => {
-            match windows.get(&window) {
-                Some(win) => {
-                    let ch = ' ' as chtype;
-                    wborder(win.0, ch, ch, ch, ch, ch, ch, ch, ch);
-                    wrefresh(win.0);
-                    delwin(win.0);
-                    windows.remove(&window);
-                },
-                _ => {},
-            }
+#[derive(Clone, Debug, Copy)]
+pub enum WindowContent {
+    Text,
+    List,
+    ScoreBoard,
+    ProgressBar
+}
+
+#[derive(Clone, Debug, Copy)]
+pub enum WindowStyle {
+    Plain,
+    Bold,
+    Highlight,
+    Blink,
+    Underline,
+}
+
+#[allow(clippy::new_ret_no_self)]
+impl WindowData {
+    pub fn new() -> WindowDataBuilder {
+        WindowDataBuilder {
+            id: String::from("Rusty Window"),
+            content: WindowContent::Text, // Default to text, because, well, that's ez.
+            message: String::from(" "),
+            style: WindowStyle::Plain,
+            ticks: None,
+            x_pos: 1,
+            y_pos: 1,
+            width: 1,
+            height: 1,
         }
     }
-    redraw(windows);
-}
 
-pub fn clear_windows(windows: &mut HashMap<String, (WINDOW, WindowData)>) {
-    // let mut WINDOW;
-    for (title, win) in &*windows {
-        match title.as_ref() {
-            "mainwindow" => { },
+    // Opens a new window and keeps track of it in the window HashMap.
+    pub fn open(&mut self) {
+        // Grab all the data out of the WindowData struct for later use. Cuts down on verbosity.
+        // Top left corner of window's (x,y) location. 0,0 is top left of screen.
+        // Window ID. What you type to do things to it. Also displayed at the top of the window.
+        let mut max_x = 0;
+        let mut max_y = 0;
+        let start_x;
+        let start_y;
+        match self.x_pos+self.y_pos {
+            -2 => {
+                /* Get the screen bounds. */
+                getmaxyx(stdscr(), &mut max_y, &mut max_x);
+                start_y = max_y / 2;
+                start_x = max_x / 2;
+            },
             _ => {
-                let ch = ' ' as chtype;
-                wborder(win.0, ch, ch, ch, ch, ch, ch, ch, ch);
-                wrefresh(win.0);
-                delwin(win.0);
-            }
+                max_x = self.x_pos;
+                max_y = self.y_pos;
+                start_y = max_y;
+                start_x = max_x;
+            },
         }
+        self.ncurses_win = Some(newwin((self.height)+2, (self.width)+2, start_y, start_x));
+        draw_win(&self, self.ncurses_win.unwrap());
+        refresh(); // We're gonna be calling this anyway.
     }
-    windows.clear();
+
+    pub fn mv(&mut self, x: i32, y: i32) {
+        self.close();
+        self.x_pos = x;
+        self.y_pos = y;
+        self.open();
+        refresh();
+    }
+
+    pub fn resize(&mut self, width: i32, height: i32) {
+        self.close();
+        self.width = width;
+        self.height = height;
+        self.open();
+        refresh();
+    }
+
+    pub fn redraw(&mut self) {
+        self.close();
+        self.open();
+        refresh();
+    }
+
+    pub fn close(&mut self) {
+        let window = self.ncurses_win.unwrap();
+        let ch = ' ' as chtype;
+        wborder(window, ch, ch, ch, ch, ch, ch, ch, ch);
+        wrefresh(window);
+        delwin(window);
+        refresh();
+    }
 }
 
-pub fn draw_win(new_window: &WindowData, win: WINDOW) {
+pub struct WindowDataBuilder {
+    pub id : String, // The title of the window and what you'll refer to it with
+    pub content: WindowContent, // What kind of window it will be
+    pub message  : String,
+    pub style    : WindowStyle,
+    pub ticks    : Option<String>,
+    pub x_pos    : i32,
+    pub y_pos    : i32,
+    pub width    : i32,
+    pub height   : i32,
+}
+
+impl WindowDataBuilder {
+    pub fn build(self) -> WindowData {
+        WindowData {
+            id: self.id,
+            content: self.content,
+            message: self.message,
+            style: self.style,
+            ticks: self.ticks,
+            x_pos: self.x_pos,
+            y_pos: self.y_pos,
+            width: self.width,
+            height: self.height,
+            priority: false,
+            ncurses_win: None,
+        }
+    }
+
+    pub fn with_id<S: Into<String>>(mut self, id: S) -> Self {
+        self.id = id.into();
+        self
+    }
+
+    pub fn with_content(mut self, content: WindowContent) -> Self {
+        self.content = content;
+        self
+    }
+
+    pub fn with_message<S: Into<String>>(mut self, message: S) -> Self {
+        self.message = message.into();
+        self
+    }
+    
+    pub fn with_style(mut self, style: WindowStyle) -> Self {
+        self.style = style;
+        self
+    }
+
+    pub fn with_ticks<S: Into<String>>(mut self, ticks: S) -> Self {
+        self.ticks = Some(ticks.into());
+        self
+    }
+
+    pub fn with_position(mut self, position_x: i32, position_y: i32) -> Self {
+        self.x_pos = position_x.into();
+        self.y_pos = position_y.into();
+        self
+    }
+
+    pub fn with_dimensions(mut self, dimension_x: i32, dimension_y: i32) -> Self {
+        self.width = dimension_x;
+        self.height = dimension_y;
+        self
+    }
+}
+
+pub fn launch() {
+    // Setup ncurses.
+    initscr();
+    raw();
+
+    // Allow for extended keyboard (like F1).
+    keypad(stdscr(), true);
+    noecho();
+
+    // Invisible cursor.
+    curs_set(CURSOR_VISIBILITY::CURSOR_INVISIBLE);
+
+    // Log buffer to use for keeping track of command output.
+    let mut logbuffer: Vec<String> = Vec::new();
+    for _i in 0..5 {
+        logbuffer.push(" ".to_string());
+    }
+
+    refresh();
+
+    // Get the screen bounds. TODO: Handle resizing.
+    let mut max_x = 0;
+    let mut max_y = 0;
+    getmaxyx(stdscr(), &mut max_y, &mut max_x);
+}
+
+fn draw_win(new_window: &WindowData, win: WINDOW) {
+    // Reduce verbosity.
     let x_loc = new_window.x_pos;
     let y_loc = new_window.y_pos;
     let x_dim = new_window.width;
@@ -59,10 +211,12 @@ pub fn draw_win(new_window: &WindowData, win: WINDOW) {
     let name = &new_window.id;
     let message = &new_window.message;
     let style = &new_window.style;
+    let ticks = &new_window.ticks;
     let mut max_x = 0;
     let mut max_y = 0;
     let start_x;
     let start_y;
+
     match x_loc+y_loc {
         -2 => {
             /* Get the screen bounds. */
@@ -79,25 +233,25 @@ pub fn draw_win(new_window: &WindowData, win: WINDOW) {
     }
 
     let mut attribute = A_NORMAL();
-    match style.as_str() {
-        "bold" => {
+    match style {
+        WindowStyle::Bold => {
             attribute = A_BOLD();
         },
-        "highlight" => {
+        WindowStyle::Highlight => {
             attribute = A_STANDOUT();
         },
-        "blink" => {
+        WindowStyle::Blink => {
             attribute = A_BLINK();
         },
-        "underline" => {
+        WindowStyle::Underline => {
             attribute = A_UNDERLINE();
         },
         _ => {},
     }
 
     // Match content, then use that to figure out the data.
-    match new_window.content.as_str() {
-        "Text" | "T" => { // Display whatever text you need in a normal, window wrapping fashion.
+    match new_window.content {
+        WindowContent::Text => { // Display whatever text you need in a normal, window wrapping fashion.
             attron(attribute);
             if message.len() > (x_dim as usize) {
                 let real_x_dim = x_dim as usize;
@@ -116,7 +270,7 @@ pub fn draw_win(new_window: &WindowData, win: WINDOW) {
             }
             attroff(attribute);
         },
-        "List" | "L" => { // Display a list of items or options
+        WindowContent::List => { // Display a list of items or options
             let list_data = message.split('|').collect::<Vec<&str>>();
             attron(A_UNDERLINE());
             for i in 0..list_data.len() {
@@ -129,7 +283,7 @@ pub fn draw_win(new_window: &WindowData, win: WINDOW) {
             }
             attroff(A_UNDERLINE());
         },
-        "Scoreboard" | "S" | "SB" | "Score" => { // Like a list, but you can pair numbers with it. Unsorted.
+        WindowContent::ScoreBoard => { // Like a list, but you can pair numbers with it. Unsorted.
             let list_data = message.split('|').collect::<Vec<&str>>();
             attron(A_UNDERLINE());
             for i in 0..list_data.len() {
@@ -152,26 +306,23 @@ pub fn draw_win(new_window: &WindowData, win: WINDOW) {
             }
             attroff(A_UNDERLINE());
         },
-        "ProgressBar" | "PB" | "ProgBar" | "Bar" | "B" => { // Display a bar of some sort in a window.
-                                                            // (Window heights of 1 work best).
-            //Collect the fraction into individual variables.
-            let pb_style = style.split('|').collect::<Vec<&str>>();
+        WindowContent::ProgressBar => {
+            // Display a bar of some sort in a window.
+            // (Window heights of 1 work best).
+            
             let mut pb_bg = A_STANDOUT();
-            let mut pb_ch = " ";
-            match pb_style[0] {
-                "low" => {
-                    pb_bg = A_NORMAL();
-                },
-                "blink" => {
-                    pb_bg = A_BLINK();
-                },
+            let pb_ch = match ticks {
+                Some(character) => character,
+                _ => "#",
+            };
+
+            match style {
+                WindowStyle::Plain => pb_bg = A_NORMAL(),
+                WindowStyle::Blink => pb_bg = A_BLINK(),
                 _ => {},
             }
-            if pb_style.len() > 1 && pb_style[1].len() > 0 {
-                pb_ch = pb_style[1];
-            }
 
-            let metrics = message.split('|').collect::<Vec<&str>>();
+            let metrics = message.split('/').collect::<Vec<&str>>();
             let lower = metrics[0].parse::<f32>().unwrap();
             let upper = metrics[1].parse::<f32>().unwrap();
             let absolute_progress = ((lower/upper)*(x_dim as f32)) as i32; // How far across the window the bar is
@@ -188,7 +339,6 @@ pub fn draw_win(new_window: &WindowData, win: WINDOW) {
             mvprintw(start_y+y_dim+1, start_x+x_dim-1-message.len() as i32, &progress_string);
             attroff(A_BOLD());
         },
-        _ => { dbg!("Dawg something totally whack happened I guess. o7 to your debugging."); },
     }
     box_(win, 0, 0);
     wrefresh(win);
@@ -196,139 +346,4 @@ pub fn draw_win(new_window: &WindowData, win: WINDOW) {
     let title = format!("|{}|", name);
     mvprintw(start_y, start_x+1, &title);
     attroff(A_BOLD());
-}
-
-// Opens a new window and keeps track of it in the window HashMap.
-pub fn open_win(new_window: WindowData, windows: &mut HashMap<String, (WINDOW, WindowData)>) {
-    // Grab all the data out of the WindowData struct for later use. Cuts down on verbosity.
-    // Top left corner of window's (x,y) location. 0,0 is top left of screen.
-    let x_loc = new_window.x_pos;
-    let y_loc = new_window.y_pos;
-    // (x,y) size of window
-    let x_dim = new_window.width;
-    let y_dim = new_window.height;
-    // Window ID. What you type to do things to it. Also displayed at the top of the window.
-    let name = &new_window.id;
-    if !windows.contains_key(&name.to_string()) || new_window.priority { // TODO: Err when contains key.
-        // if windows.contains_key(&name.to_string()) && new_window.priority {
-        //     close_win(name.to_string(), windows);
-        // }
-        // Track the existence of the window.
-        let mut max_x = 0;
-        let mut max_y = 0;
-        let start_x;
-        let start_y;
-        match x_loc+y_loc {
-            -2 => {
-                /* Get the screen bounds. */
-                getmaxyx(stdscr(), &mut max_y, &mut max_x);
-                start_y = max_y / 2;
-                start_x = max_x / 2;
-            },
-            _ => {
-                max_x = x_loc;
-                max_y = y_loc;
-                start_y = max_y;
-                start_x = max_x;
-            },
-        }
-        let win = newwin((y_dim)+2, (x_dim)+2, start_y, start_x);
-        draw_win(&new_window, win);
-        windows.insert(name.to_string(), (win, new_window));
-    }
-}
-
-// Redraws the windows open on screen when anything changes that could expose
-// hidden content such as a window closing. Shouldn't be used by the user.
-pub fn redraw(windows: &mut HashMap<String, (WINDOW, WindowData)>) {
-    for (_window,data) in windows {
-        draw_win(&data.1, data.0);
-        newwin((data.1.height)+2, (data.1.width)+2, data.1.y_pos, data.1.x_pos);
-    }
-}
-
-pub fn move_window(window: String, new_x_pos: i32, new_y_pos: i32, windows: &mut HashMap<String, (WINDOW, WindowData)>) {
-    match windows.get(&window) {
-        Some(win) => {
-            let ch = ' ' as chtype;
-            wborder(win.0, ch, ch, ch, ch, ch, ch, ch, ch);
-            wrefresh(win.0);
-            delwin(win.0);
-            let new_win_data = WindowData {
-                id:      win.1.id.clone(),
-                content: win.1.content.clone(),
-                message: win.1.message.clone(),
-                style:   win.1.style.clone(),
-                x_pos:   new_x_pos,
-                y_pos:   new_y_pos,
-                width:   win.1.width,
-                height:  win.1.height,
-                priority: win.1.priority,
-            };
-            windows.remove(&window);
-            open_win(new_win_data, windows);
-        },
-        _ => {
-            mvprintw(2, 0, "Invalid window name!");
-        },
-    }
-    redraw(windows);
-}
-
-
-pub fn resize_window(window: String, new_x_pos: i32, new_y_pos: i32, windows: &mut HashMap<String, (WINDOW, WindowData)>) {
-    match windows.get(&window) {
-        Some(win) => {
-            let ch = ' ' as chtype;
-            wborder(win.0, ch, ch, ch, ch, ch, ch, ch, ch);
-            wrefresh(win.0);
-            delwin(win.0);
-            let new_win_data = WindowData {
-                id:      win.1.id.clone(),
-                content: win.1.content.clone(),
-                message: win.1.message.clone(),
-                style:   win.1.style.clone(),
-                x_pos:   win.1.x_pos,
-                y_pos:   win.1.y_pos,
-                width:   new_x_pos,
-                height:  new_y_pos,
-                priority: win.1.priority,
-            };
-            windows.remove(&window);
-            open_win(new_win_data, windows);
-        },
-        _ => {
-            mvprintw(2, 0, "Invalid window name!");
-        },
-    }
-    redraw(windows);
-}
-
-// Redraws the log.
-pub fn get_log(logbuffer: &Vec<String>, show_console: bool) {
-    if show_console {
-        let mut max_x = 0;
-        let mut max_y = 0;
-        /* Get the screen bounds. */
-        getmaxyx(stdscr(), &mut max_y, &mut max_x);
-        mv(5, 0);
-        for _i in 0..max_x {
-            addstr("-");
-        }
-        attron(A_BOLD());
-        mvprintw(5, COLS() - 8, &"Console");
-        attroff(A_BOLD());
-        mv(0,0);
-
-        //Update log window...
-        for i in 0..5 {
-            mv(i,0);
-            clrtoeol();
-        }
-        mv(0,0);
-        for i in (0..5).rev() {
-            mv(4-(i as i32), 0);
-            addstr(logbuffer.get(i).unwrap());
-        }
-    }
 }
