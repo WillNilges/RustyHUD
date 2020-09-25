@@ -73,7 +73,7 @@ impl WindowData {
             },
         }
         self.ncurses_win = Some(newwin((self.height)+2, (self.width)+2, start_y, start_x));
-        draw_win(&self, self.ncurses_win.unwrap());
+        draw_win(&self);
         refresh(); // We're gonna be calling this anyway.
     }
 
@@ -112,7 +112,7 @@ impl WindowData {
 pub struct WindowDataBuilder {
     pub id : String, // The title of the window and what you'll refer to it with
     pub content: WindowContent, // What kind of window it will be
-    pub message  : String,
+    pub message  : String, // The contents of a window.
     pub style    : WindowStyle,
     pub ticks    : Option<String>,
     pub x_pos    : i32,
@@ -202,7 +202,8 @@ pub fn launch() {
     getmaxyx(stdscr(), &mut max_y, &mut max_x);
 }
 
-fn draw_win(new_window: &WindowData, win: WINDOW) {
+// Renders the window using parameters from a WindowData object.
+fn draw_win(new_window: &WindowData) {
     // Reduce verbosity.
     let x_loc = new_window.x_pos;
     let y_loc = new_window.y_pos;
@@ -212,6 +213,7 @@ fn draw_win(new_window: &WindowData, win: WINDOW) {
     let message = &new_window.message;
     let style = &new_window.style;
     let ticks = &new_window.ticks;
+    let win = &new_window.ncurses_win;
     let mut max_x = 0;
     let mut max_y = 0;
     let start_x;
