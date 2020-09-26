@@ -6,6 +6,7 @@ pub struct WindowData {
     pub id       : String,
     pub content  : WindowContent,
     pub message  : String,
+    pub items    : Vec<String>,
     pub style    : WindowStyle,
     pub ticks    : Option<String>,
     pub x_pos    : i32,
@@ -40,6 +41,7 @@ impl WindowData {
             id: String::from("Rusty Window"),
             content: WindowContent::Text, // Default to text, because, well, that's ez.
             message: String::from(" "),
+            items: vec![String::from(" ")],
             style: WindowStyle::Plain,
             ticks: None,
             x_pos: 1,
@@ -110,9 +112,10 @@ impl WindowData {
 }
 
 pub struct WindowDataBuilder {
-    pub id : String, // The title of the window and what you'll refer to it with
-    pub content: WindowContent, // What kind of window it will be
-    pub message  : String, // The contents of a window.
+    pub id       : String,         // The title of the window and what you'll refer to it with
+    pub content  : WindowContent,  // What kind of window it will be
+    pub message  : String,         // The contents of a window.
+    pub items    : Vec<String>,
     pub style    : WindowStyle,
     pub ticks    : Option<String>,
     pub x_pos    : i32,
@@ -127,6 +130,7 @@ impl WindowDataBuilder {
             id: self.id,
             content: self.content,
             message: self.message,
+            items: self.items,
             style: self.style,
             ticks: self.ticks,
             x_pos: self.x_pos,
@@ -148,8 +152,15 @@ impl WindowDataBuilder {
         self
     }
 
+    // For text and progress bars
     pub fn with_message<S: Into<String>>(mut self, message: S) -> Self {
         self.message = message.into();
+        self
+    }
+
+    // For Lists and ScoreBoards
+    pub fn with_items(mut self, items: Vec<&str>) -> Self {
+        self.items = items.iter().map(|s| s.to_string()).collect();
         self
     }
     
@@ -211,9 +222,10 @@ fn draw_win(new_window: &WindowData) {
     let y_dim = new_window.height;
     let name = &new_window.id;
     let message = &new_window.message;
+    let items = &new_window.items;
     let style = &new_window.style;
     let ticks = &new_window.ticks;
-    let win = &new_window.ncurses_win;
+    let win = new_window.ncurses_win.unwrap();
     let mut max_x = 0;
     let mut max_y = 0;
     let start_x;
@@ -273,7 +285,7 @@ fn draw_win(new_window: &WindowData) {
             attroff(attribute);
         },
         WindowContent::List => { // Display a list of items or options
-            let list_data = message.split('|').collect::<Vec<&str>>();
+            let list_data = items;
             attron(A_UNDERLINE());
             for i in 0..list_data.len() {
                 for j in 0..x_dim {
@@ -286,7 +298,7 @@ fn draw_win(new_window: &WindowData) {
             attroff(A_UNDERLINE());
         },
         WindowContent::ScoreBoard => { // Like a list, but you can pair numbers with it. Unsorted.
-            let list_data = message.split('|').collect::<Vec<&str>>();
+            let list_data = items;
             attron(A_UNDERLINE());
             for i in 0..list_data.len() {
                 for j in 0..x_dim {
